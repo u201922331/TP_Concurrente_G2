@@ -219,6 +219,14 @@ func SortByCodUnidadEjecutora(a Registro, b Registro, asc bool) bool {
 	}
 }
 
+func SortByNumAtenciones(a Registro, b Registro, asc bool) bool {
+	if asc {
+		return a.atenciones < b.atenciones
+	} else {
+		return a.atenciones > b.atenciones
+	}
+}
+
 func PrintRegistros(r []Registro, first int, last int) {
 	fmt.Printf("TAMAÑO: %d\n", len(r))
 	fmt.Println("ID | FECHA | REGION | PROVINCIA | UBIGEO DISTRITO | COD UNIDAD EJECUTORA | COD IPRESS | IPRESS | NIVEL EESS | PLAN DE SEGURO | COD SERVICIO | DESC SERVICIO | SEXO | GRUPO EDAD | ATENCIONES")
@@ -254,4 +262,10 @@ func main() {
 	t3 := time.Since(tStart)
 	PrintRegistros(reg3, 5, 5)
 	fmt.Printf("Duración: %s\n\n", t3)
+
+	tStart = time.Now()
+	reg4 := MergeSort(registros, SortByNumAtenciones, true)
+	t4 := time.Since(tStart)
+	PrintRegistros(reg4, 5, 5)
+	fmt.Printf("Duración: %s\n\n", t4)
 }
