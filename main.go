@@ -91,14 +91,14 @@ type Sortables interface {
 }
 
 // Combinar los dos arreglos ingresados y de manera ordenada
-func Merge[T Sortables](a []T, b []T, p func(T, T) bool) []T {
+func Merge[T Sortables](a []T, b []T, p func(T, T, bool) bool, asc bool) []T {
 	var c []T
 	i, j := 0, 0
 
 	var m sync.Mutex // mutex para la sincroinzación segura
 
 	for i < len(a) && j < len(b) {
-		if p(a[i], b[j]) {
+		if p(a[i], b[j], asc) {
 			c = append(c, a[i])
 			i++
 		} else {
@@ -126,7 +126,7 @@ const (
 )
 
 // Punto de entrada. El segundo parámetro sirve para personalizar la función de criterio de ordenamiento
-func MergeSort[T Sortables](arr []T, p func(T, T) bool) []T {
+func MergeSort[T Sortables](arr []T, p func(T, T, bool) bool, asc bool) []T {
 	if len(arr) <= 1 {
 		return arr
 	}
@@ -135,45 +135,71 @@ func MergeSort[T Sortables](arr []T, p func(T, T) bool) []T {
 	var l, r []T
 
 	if len(arr) <= SIZE_THRESHOLD { // Secuencial
-		l = MergeSort(arr[:half], p)
-		r = MergeSort(arr[half:], p)
+		l = MergeSort(arr[:half], p, asc)
+		r = MergeSort(arr[half:], p, asc)
 	} else { // Paralelo
 		var wg sync.WaitGroup
 		wg.Add(2)
 
 		go func() {
 			defer wg.Done()
-			l = MergeSort(arr[:half], p)
+			l = MergeSort(arr[:half], p, asc)
 		}()
 
 		go func() {
 			defer wg.Done()
-			r = MergeSort(arr[half:], p)
+			r = MergeSort(arr[half:], p, asc)
 		}()
 
 		wg.Wait()
 	}
 
-	return Merge(l, r, p)
+	return Merge(l, r, p, asc)
 }
 
 // Función de ordenamiento personalizable
-func SortByDateAsc(a Registro, b Registro) bool {
-	if a.yyyy < b.yyyy {
-		return true
+func SortByDate(a Registro, b Registro, asc bool) bool {
+	if asc {
+		if a.yyyy < b.yyyy {
+			return true
+		}
+		if a.yyyy == b.yyyy && a.mm < b.mm {
+			return true
+		}
+	} else {
+		if a.yyyy > b.yyyy {
+			return true
+		}
+		if a.yyyy == b.yyyy && a.mm > b.mm {
+			return true
+		}
 	}
-	if a.yyyy == b.yyyy && a.mm < b.mm {
-		return true
-	}
+
 	return false
+}
+
+func SortByCodIPRESS(a Registro, b Registro, asc bool) bool {
+	if asc {
+		return a.cod_ipress < b.cod_ipress
+	} else {
+		return a.cod_ipress > b.cod_ipress
+	}
 }
 
 // Punto de entrada
 func main() {
 	registros := ReadCSV("data/data.csv")
-	registros = MergeSort(registros, SortByDateAsc)
+	registros = MergeSort(registros, SortByDate, false)
 
-	for idx, reg := range registros {
-		fmt.Printf("REGISTRO %d: %d/%d\n", idx, reg.mm, reg.yyyy)
+	var first, last int = 5, 5
+
+	fmt.Println("ID | AÑO | MES | REGION | PROVINCIA | UBIGEO DISTRITO | COD UNIDAD EJECUTORA | COD IPRESS | IPRESS | NIVEL EESS | PLAN DE SEGURO | COD SERVICIO | DESC SERVICIO | SEXO | GRUPO EDAD | ATENCIONES")
+	fmt.Println("================================================================================================================================================================================================")
+	for idx, reg := range registros[:first] {
+		fmt.Println(idx, '|', reg)
+	}
+	fmt.Print("\n...\n\n")
+	for idx, reg := range registros[len(registros)-last:] {
+		fmt.Println(len(registros)-last+idx, '|', reg)
 	}
 }
