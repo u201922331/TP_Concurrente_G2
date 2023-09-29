@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // Contenido de cada fila
@@ -85,6 +86,29 @@ func ReadCSV(filename string) []Registro {
 	return registros
 }
 
+func toString(r Registro) string {
+	var s string
+	s += "{"
+	s += strconv.Itoa(r.mm) + "/" + strconv.Itoa(r.yyyy) + " | "
+	s += r.region + " | "
+	s += r.provincia + " | "
+	s += r.ubigeo_distrito + " | "
+	s += r.distrito + " | "
+	s += r.cod_unidad_ejecutora + " | "
+	s += r.desc_unidad_ejecutora + " | "
+	s += r.cod_ipress + " | "
+	s += r.ipress + " | "
+	s += r.nivel_eess + " | "
+	s += r.plan_de_seguro + " | "
+	s += r.cod_servicio + " | "
+	s += r.desc_servicio + " | "
+	s += r.sexo + " | "
+	s += r.grupo_edad + " | "
+	s += strconv.Itoa(r.atenciones)
+	s += "}"
+	return s
+}
+
 // Agregado soporte a Templates/Generics
 type Sortables interface {
 	int | int16 | int32 | float32 | float64 | string | Registro
@@ -157,7 +181,8 @@ func MergeSort[T Sortables](arr []T, p func(T, T, bool) bool, asc bool) []T {
 	return Merge(l, r, p, asc)
 }
 
-// Función de ordenamiento personalizable
+// Funciones de ordenamiento
+
 func SortByDate(a Registro, b Registro, asc bool) bool {
 	if asc {
 		if a.yyyy < b.yyyy {
@@ -186,20 +211,47 @@ func SortByCodIPRESS(a Registro, b Registro, asc bool) bool {
 	}
 }
 
+func SortByCodUnidadEjecutora(a Registro, b Registro, asc bool) bool {
+	if asc {
+		return a.cod_unidad_ejecutora < b.cod_unidad_ejecutora
+	} else {
+		return a.cod_unidad_ejecutora > b.cod_unidad_ejecutora
+	}
+}
+
+func PrintRegistros(r []Registro, first int, last int) {
+	fmt.Printf("TAMAÑO: %d\n", len(r))
+	fmt.Println("ID | FECHA | REGION | PROVINCIA | UBIGEO DISTRITO | COD UNIDAD EJECUTORA | COD IPRESS | IPRESS | NIVEL EESS | PLAN DE SEGURO | COD SERVICIO | DESC SERVICIO | SEXO | GRUPO EDAD | ATENCIONES")
+	fmt.Println("================================================================================================================================================================================================")
+	for idx, reg := range r[:first] {
+		fmt.Println(idx, "->", toString(reg))
+	}
+	fmt.Print("\n...\n\n")
+	for idx, reg := range r[len(r)-last:] {
+		fmt.Println(len(r)-last+idx, "->", toString(reg))
+	}
+	fmt.Println("================================================================================================================================================================================================")
+}
+
 // Punto de entrada
 func main() {
 	registros := ReadCSV("data/data.csv")
-	registros = MergeSort(registros, SortByDate, false)
 
-	var first, last int = 5, 5
+	tStart := time.Now()
+	reg1 := MergeSort(registros, SortByDate, true)
+	t1 := time.Since(tStart)
+	PrintRegistros(reg1, 5, 5)
+	fmt.Printf("Duración: %s\n\n", t1)
 
-	fmt.Println("ID | AÑO | MES | REGION | PROVINCIA | UBIGEO DISTRITO | COD UNIDAD EJECUTORA | COD IPRESS | IPRESS | NIVEL EESS | PLAN DE SEGURO | COD SERVICIO | DESC SERVICIO | SEXO | GRUPO EDAD | ATENCIONES")
-	fmt.Println("================================================================================================================================================================================================")
-	for idx, reg := range registros[:first] {
-		fmt.Println(idx, '|', reg)
-	}
-	fmt.Print("\n...\n\n")
-	for idx, reg := range registros[len(registros)-last:] {
-		fmt.Println(len(registros)-last+idx, '|', reg)
-	}
+	tStart = time.Now()
+	reg2 := MergeSort(registros, SortByCodIPRESS, true)
+	t2 := time.Since(tStart)
+	PrintRegistros(reg2, 5, 5)
+	fmt.Printf("Duración: %s\n\n", t2)
+
+	tStart = time.Now()
+	reg3 := MergeSort(registros, SortByCodUnidadEjecutora, true)
+	t3 := time.Since(tStart)
+	PrintRegistros(reg3, 5, 5)
+	fmt.Printf("Duración: %s\n\n", t3)
 }
