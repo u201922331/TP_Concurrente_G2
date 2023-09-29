@@ -6,9 +6,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-// This is what a row contains
+// Contenido de cada fila
 type Registro struct {
 	yyyy                  int
 	mm                    int
@@ -29,7 +30,7 @@ type Registro struct {
 	atenciones            int
 }
 
-// Helper function to convert string to int
+// Conversión a int (más sencilla)
 func toInt(str string) int {
 	result, err := strconv.Atoi(str)
 	if err != nil {
@@ -39,7 +40,7 @@ func toInt(str string) int {
 	return result
 }
 
-// Easily read the dataset
+// Fácil lectura del CSV seleccionado
 func ReadCSV(filename string) []Registro {
 	file, err := os.Open(filename)
 
@@ -84,15 +85,17 @@ func ReadCSV(filename string) []Registro {
 	return registros
 }
 
-// Templates/Generics support
+// Agregado soporte a Templates/Generics
 type Sortables interface {
 	int | int16 | int32 | float32 | float64 | string | Registro
 }
 
-// Merge two arrays together
+// Combinar los dos arreglos ingresados y de manera ordenada
 func Merge[T Sortables](a []T, b []T, p func(T, T) bool) []T {
 	var c []T
 	i, j := 0, 0
+
+	var m sync.Mutex // mutex para la sincroinzación segura
 
 	for i < len(a) && j < len(b) {
 		if p(a[i], b[j]) {
@@ -103,28 +106,58 @@ func Merge[T Sortables](a []T, b []T, p func(T, T) bool) []T {
 			j++
 		}
 	}
+
+	// Bloquear el acceso concurrente a c
+	m.Lock()
+	defer m.Unlock()
+
 	for ; i < len(a); i++ {
 		c = append(c, a[i])
 	}
 	for ; j < len(b); j++ {
 		c = append(c, b[j])
 	}
+
 	return c
 }
 
-// Entry point. First parameter is the array/slice to sort, the second one works as a comparison function
+const (
+	SIZE_THRESHOLD = (1 << 11)
+)
+
+// Punto de entrada. El segundo parámetro sirve para personalizar la función de criterio de ordenamiento
 func MergeSort[T Sortables](arr []T, p func(T, T) bool) []T {
 	if len(arr) <= 1 {
 		return arr
 	}
 
 	half := len(arr) / 2
-	l := MergeSort(arr[:half], p)
-	r := MergeSort(arr[half:], p)
+	var l, r []T
+
+	if len(arr) <= SIZE_THRESHOLD { // Secuencial
+		l = MergeSort(arr[:half], p)
+		r = MergeSort(arr[half:], p)
+	} else { // Paralelo
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			l = MergeSort(arr[:half], p)
+		}()
+
+		go func() {
+			defer wg.Done()
+			r = MergeSort(arr[half:], p)
+		}()
+
+		wg.Wait()
+	}
 
 	return Merge(l, r, p)
 }
 
+// Función de ordenamiento personalizable
 func SortByDateAsc(a Registro, b Registro) bool {
 	if a.yyyy < b.yyyy {
 		return true
@@ -135,9 +168,10 @@ func SortByDateAsc(a Registro, b Registro) bool {
 	return false
 }
 
+// Punto de entrada
 func main() {
 	registros := ReadCSV("data/data.csv")
-	registros = MergeSort(registros, SortByDateAsc) // TODO: GoRoutines
+	registros = MergeSort(registros, SortByDateAsc)
 
 	for idx, reg := range registros {
 		fmt.Printf("REGISTRO %d: %d/%d\n", idx, reg.mm, reg.yyyy)
