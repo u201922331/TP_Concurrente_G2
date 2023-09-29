@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// This is what a row contains
 type Registro struct {
 	yyyy                  int
 	mm                    int
@@ -28,22 +29,28 @@ type Registro struct {
 	atenciones            int
 }
 
+// Helper function to convert string to int
 func toInt(str string) int {
-	result, _ := strconv.Atoi(str)
+	result, err := strconv.Atoi(str)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 	return result
 }
 
+// Easily read the dataset
 func ReadCSV(filename string) []Registro {
 	file, err := os.Open(filename)
 
+	registros := []Registro{}
+
 	if err != nil {
 		fmt.Println(err.Error())
-		return []Registro{}
+		return registros
 	}
 
 	defer file.Close()
-
-	registros := []Registro{}
 
 	scanner := bufio.NewScanner(file)
 	i := 0
@@ -77,9 +84,62 @@ func ReadCSV(filename string) []Registro {
 	return registros
 }
 
+// Templates/Generics support
+type Sortables interface {
+	int | int16 | int32 | float32 | float64 | string | Registro
+}
+
+// Merge two arrays together
+func Merge[T Sortables](a []T, b []T, p func(T, T) bool) []T {
+	var c []T
+	i, j := 0, 0
+
+	for i < len(a) && j < len(b) {
+		if p(a[i], b[j]) {
+			c = append(c, a[i])
+			i++
+		} else {
+			c = append(c, b[j])
+			j++
+		}
+	}
+	for ; i < len(a); i++ {
+		c = append(c, a[i])
+	}
+	for ; j < len(b); j++ {
+		c = append(c, b[j])
+	}
+	return c
+}
+
+// Entry point. First parameter is the array/slice to sort, the second one works as a comparison function
+func MergeSort[T Sortables](arr []T, p func(T, T) bool) []T {
+	if len(arr) <= 1 {
+		return arr
+	}
+
+	half := len(arr) / 2
+	l := MergeSort(arr[:half], p)
+	r := MergeSort(arr[half:], p)
+
+	return Merge(l, r, p)
+}
+
+func SortByDateAsc(a Registro, b Registro) bool {
+	if a.yyyy < b.yyyy {
+		return true
+	}
+	if a.yyyy == b.yyyy && a.mm < b.mm {
+		return true
+	}
+	return false
+}
+
 func main() {
-	registros := ReadCSV("test.txt")
+	registros := ReadCSV("data/data.csv")
+	registros = MergeSort(registros, SortByDateAsc) // TODO: GoRoutines
+
 	for idx, reg := range registros {
-		fmt.Println("REGISTRO ", idx, ": ", reg)
+		fmt.Printf("REGISTRO %d: %d/%d\n", idx, reg.mm, reg.yyyy)
 	}
 }
